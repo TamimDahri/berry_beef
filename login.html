@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<title>Log in – Cameron Strawberry</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#F0585F">
+<link rel="icon" href="images/logo-mark.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Figtree:wght@700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/app.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/config.js"></script>
+<script src="js/api.js"></script>
+<script src="js/common.js"></script>
+</head>
+<body>
+<header id="apphead"></header>
+<main id="main">
+  <div class="auth">
+    <div id="authbox"></div>
+  </div>
+</main>
+<script>
+const params = new URLSearchParams(location.search);
+const next = params.get("next");
+appHeader(null, "Log in");
+
+function view(mode, msg) {
+  const box = $("#authbox");
+  if (!configured()) { box.innerHTML = `<h1>almost ready.</h1><p class="sub">Online ordering opens soon. Until then, order on WhatsApp.</p><p style="margin-top:18px"><a class="btn" href="https://wa.me/${CS_CONFIG.WHATSAPP_NUMBER}">Order on WhatsApp</a></p>`; return; }
+  if (mode === "signup") {
+    box.innerHTML = `<h1>create your account.</h1>
+      <p class="sub">Save your address once, then order in a few taps every week. Already ordered with us on WhatsApp? Use the same phone number and we will find your details.</p>
+      <form id="f" class="stack" style="margin-top:22px" novalidate>
+        <label class="f">Your name<input name="name" autocomplete="name" required></label>
+        <label class="f">WhatsApp number<input name="phone" type="tel" autocomplete="tel" placeholder="e.g. 012 345 6789" required></label>
+        <label class="f">Email<input name="email" type="email" autocomplete="email" required></label>
+        <label class="f">Password <small>(at least 8 characters)</small><input name="password" type="password" autocomplete="new-password" minlength="8" required></label>
+        <div id="msg">${msg || ""}</div>
+        <button class="btn" type="submit">Create account</button>
+      </form>
+      <p class="switch">Have an account? <button class="linkbtn" data-mode="login">Log in</button></p>`;
+  } else if (mode === "forgot") {
+    box.innerHTML = `<h1>reset your password.</h1><p class="sub">We will email you a link to choose a new password.</p>
+      <form id="f" class="stack" style="margin-top:22px" novalidate>
+        <label class="f">Email<input name="email" type="email" autocomplete="email" required></label>
+        <div id="msg">${msg || ""}</div>
+        <button class="btn" type="submit">Send reset link</button>
+      </form>
+      <p class="switch"><button class="linkbtn" data-mode="login">Back to log in</button></p>`;
+  } else if (mode === "newpass") {
+    box.innerHTML = `<h1>choose a new password.</h1>
+      <form id="f" class="stack" style="margin-top:22px" novalidate>
+        <label class="f">New password <small>(at least 8 characters)</small><input name="password" type="password" autocomplete="new-password" minlength="8" required></label>
+        <div id="msg">${msg || ""}</div>
+        <button class="btn" type="submit">Save password</button>
+      </form>`;
+  } else {
+    box.innerHTML = `<h1>log in.</h1><p class="sub">Customers, riders and the Cameron Strawberry team all log in here.</p>
+      <form id="f" class="stack" style="margin-top:22px" novalidate>
+        <label class="f">Email<input name="email" type="email" autocomplete="email" required></label>
+        <label class="f">Password<input name="password" type="password" autocomplete="current-password" required></label>
+        <div id="msg">${msg || ""}</div>
+        <button class="btn" type="submit">Log in</button>
+      </form>
+      <p class="switch">New here? <button class="linkbtn" data-mode="signup">Create an account</button></p>
+      <p class="switch"><button class="linkbtn" data-mode="forgot">Forgot your password?</button></p>`;
+  }
+  $("#f").onsubmit = (e) => { e.preventDefault(); submit(mode, new FormData(e.target), e.submitter || $("#f button")); };
+  $$("[data-mode]").forEach((b) => (b.onclick = () => view(b.dataset.mode)));
+  const first = $("#f input"); if (first) first.focus();
+}
+const fail = (t) => { $("#msg").innerHTML = `<div class="err">${esc(t)}</div>`; };
+function friendly(m) {
+  if (/invalid login/i.test(m)) return "That email and password do not match. Check them and try again.";
+  if (/already registered|already been registered/i.test(m)) return "This email already has an account. Log in instead.";
+  if (/rate limit/i.test(m)) return "Too many emails sent in the last hour. Try again later or message us on WhatsApp.";
+  return m;
+}
+async function goHome() { const me = await API.me(true); location.replace(next && me.role !== "customer" ? next : (HOME[me.role] || "account.html")); }
+
+async function submit(mode, fd, btn) {
+  const v = (k) => String(fd.get(k) || "").trim();
+  btn.disabled = true;
+  try {
+    if (mode === "signup") {
+      if (!v("name")) return fail("Add your name.");
+      if (digits(v("phone")).length < 9) return fail("Add your WhatsApp number so riders can reach you.");
+      if (!/^\S+@\S+\.\S+$/.test(v("email"))) return fail("Add a valid email address.");
+      if (v("password").length < 8) return fail("Use a password of at least 8 characters.");
+      const r = await API.signUp(v("email"), v("password"), v("name"), v("phone"));
+      if (r.needsConfirm) { $("#authbox").innerHTML = `<h1>check your email.</h1><p class="sub">We sent a link to ${esc(v("email"))}. Open it to finish creating your account.</p>`; return; }
+      return goHome();
+    }
+    if (mode === "forgot") { await API.resetPassword(v("email")); $("#msg").innerHTML = `<div class="ok">If that email has an account, a reset link is on its way.</div>`; return; }
+    if (mode === "newpass") { if (v("password").length < 8) return fail("Use a password of at least 8 characters."); await API.setPassword(v("password")); toast("Password saved"); return goHome(); }
+    await API.signIn(v("email"), v("password"));
+    return goHome();
+  } catch (e) { fail(friendly(e.message)); }
+  finally { btn.disabled = false; }
+}
+
+(async () => {
+  if (!configured()) return view("login");
+  if (params.get("reset")) return view("newpass");
+  try { if (await API.session()) return goHome(); } catch (e) {}
+  view(params.get("mode") === "signup" ? "signup" : "login");
+})();
+</script>
+</body>
+</html>

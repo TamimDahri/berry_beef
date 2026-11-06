@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<title>Rider – Cameron Strawberry</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#F0585F">
+<link rel="icon" href="images/logo-mark.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Figtree:wght@700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/app.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/config.js"></script>
+<script src="js/api.js"></script>
+<script src="js/common.js"></script>
+</head>
+<body>
+<header id="apphead"></header>
+<main id="main"><p class="empty">Loading…</p></main>
+<script>
+let me, S, date, orders = [];
+(async () => {
+  if (!configured()) return (location.href = "login.html");
+  me = await guard(["rider", "admin"]);
+  appHeader(me, "Rider");
+  S = await API.settings();
+  date = new URLSearchParams(location.search).get("date") || nearestDeliveryDay(S);
+  await load();
+})().catch((e) => { if (!/signed in|wrong role/.test(e.message)) showFatal("Something went wrong: " + e.message); });
+
+async function load() { orders = await API.riderOrders(date, me.id); render(); }
+
+function render() {
+  const groups = stopGroups(orders), { links, missing } = routeLinks(groups, S);
+  const collect = orders.filter((o) => !o.paid && o.pay !== "online").reduce((a, o) => a + num(o.total), 0);
+  const done = orders.filter((o) => o.status === "delivered").length;
+  $("#main").innerHTML = `
+    <div class="toolbar"><div><h1>${fmtDate(date, true).toLowerCase()}</h1>
+      <p class="sub">${groups.length} stop${groups.length === 1 ? "" : "s"}, ${orders.length} order${orders.length === 1 ? "" : "s"}. Delivered ${done} of ${orders.length}. To collect: <strong>${rm(collect)}</strong>.</p></div>
+      <label class="f" style="margin-left:auto">Delivery day<input type="date" id="date" value="${date}"></label></div>
+    ${me.role === "admin" ? `<div class="note">You are an admin. This page only shows stops assigned to you. Assign stops on the admin page.</div>` : ""}
+    ${links.length ? `<div class="panel tint"><h2>route from TBS</h2><p class="sub">Opens Google Maps with the stops in order${links.length > 1 ? `, up to ${S.stops_per_link} per link` : ""}.</p>
+      <div class="row" style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px">${links.map((l) => `<a class="btn" href="${esc(l.url)}" target="_blank" rel="noopener">${links.length === 1 ? "Open route in Google Maps" : `Stops ${l.from} to ${l.to}`}</a>`).join("")}</div>
+      ${missing ? `<p class="note">${missing} stop${missing > 1 ? "s have" : " has"} no address and ${missing > 1 ? "are" : "is"} not in the route.</p>` : ""}</div>` : ""}
+    ${groups.length ? `<ol class="list" style="margin-top:24px">${groups.map(stopRow).join("")}</ol>` : `<p class="empty">No stops for this day yet. Check again after the admin assigns orders.</p>`}`;
+  $("#date").onchange = (e) => { if (e.target.value) { date = e.target.value; history.replaceState(null, "", "?date=" + date); load(); } };
+  $$("[data-st]").forEach((b) => (b.onclick = () => update(b.dataset.id, b.dataset.st, null, b)));
+  $$("[data-paid]").forEach((b) => (b.onclick = () => update(b.dataset.id, orders.find((o) => o.id === b.dataset.id).status === "new" ? "out" : orders.find((o) => o.id === b.dataset.id).status, true, b)));
+}
+function stopRow(g, j) {
+  const first = g.orders[0], done = g.orders.every((o) => o.status === "delivered");
+  return `<li class="stop ${done ? "done" : ""}"><div class="num">${j + 1}</div><div>
+    <div class="addr">${esc(first.address || first.zone || "No address")}</div>
+    ${first.address ? `<div class="links" style="margin-top:4px"><a href="${esc(mapsSearch(first.address))}" target="_blank" rel="noopener">Open in Maps</a></div>` : ""}
+    ${g.orders.map((o) => `<div class="person">
+      <div><strong>${esc(o.name)}</strong>${o.unit ? " · Unit " + esc(o.unit) : ""} ${statusChip(o)} ${payChip(o)}</div>
+      ${o.note ? `<div class="note" style="margin:6px 0">${esc(o.note)}</div>` : ""}
+      <div>${esc(packText(o))}${!o.paid && o.pay !== "online" ? ` · collect <strong>${rm(o.total)}</strong> by ${o.pay === "cash" ? "cash" : "QR"}` : ""}</div>
+      <div class="links" style="margin-top:4px">${o.phone ? `<a href="https://wa.me/${waPhone(o.phone)}" target="_blank" rel="noopener">WhatsApp</a><a href="tel:+${waPhone(o.phone)}">Call ${esc(o.phone)}</a>` : ""}</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+        ${o.status === "delivered" ? `<button class="btn btn-small btn-quiet" data-st="out" data-id="${o.id}">Undo delivered</button>`
+          : `<button class="btn btn-small btn-green" data-st="delivered" data-id="${o.id}">Delivered</button><button class="btn btn-small btn-quiet" data-st="nothome" data-id="${o.id}">Not home</button>`}
+        ${!o.paid ? `<button class="btn btn-small btn-quiet" data-paid="1" data-id="${o.id}">Got payment</button>` : ""}
+      </div></div>`).join("")}
+  </div></li>`;
+}
+async function update(id, status, paid, btn) {
+  btn.disabled = true;
+  try { await API.riderUpdate(id, status, paid); const o = orders.find((x) => x.id === id); o.status = status; if (paid !== null) o.paid = paid; render(); toast(paid ? "Payment recorded" : status === "delivered" ? "Marked delivered" : status === "nothome" ? "Marked not home" : "Updated"); }
+  catch (e) { toast(e.message); btn.disabled = false; }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<title>My orders – Cameron Strawberry</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#F0585F">
+<link rel="icon" href="images/logo-mark.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Figtree:wght@700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/app.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/config.js"></script>
+<script src="js/api.js"></script>
+<script src="js/common.js"></script>
+</head>
+<body>
+<header id="apphead"></header>
+<main id="main"><p class="empty">Loading…</p></main>
+<script>
+let me, S, next, orders = [], cust;
+const qty = { mixed: 0, big: 0, white: 0 };
+const MIN = { mixed: 1, big: 1, white: 0.5 };
+
+(async () => {
+  if (!configured()) return (location.href = "login.html");
+  me = await guard(["customer", "admin", "rider"]);
+  appHeader(me, "My orders");
+  [S, next] = await Promise.all([API.settings(), API.nextDeliveryDate()]);
+  cust = me.customer;
+  if (!cust) return showFatal("We could not find your delivery details. Message us on WhatsApp and we will fix it.");
+  orders = await API.myOrders(cust.id);
+  render();
+})().catch((e) => { if (!/signed in|wrong role/.test(e.message)) showFatal("Something went wrong: " + e.message); });
+
+function render() {
+  const hasAddress = cust.address.trim().length > 2;
+  const upcoming = orders.filter((o) => o.status !== "cancelled" && o.delivery_date >= (next || "9999"));
+  $("#main").innerHTML = `
+    <h1>hi ${esc((cust.name || "").split(" ")[0].toLowerCase() || "there")}.</h1>
+    <p class="sub">${next ? `Next delivery: <strong>${fmtDate(next, true)}</strong>, 3pm to 9pm. Order by ${cutoffText(next, S)}.` : "Orders are closed for now. Message us on WhatsApp."}</p>
+    <div class="grid2" style="margin-top:24px">
+      <section class="panel" aria-labelledby="order-h">
+        <h2 id="order-h">order for ${next ? fmtDate(next).toLowerCase() : "next week"}</h2>
+        ${upcoming.length ? `<div class="note">You already have ${upcoming.length === 1 ? "an order" : upcoming.length + " orders"} for this delivery. A new order is delivered together with it.</div>` : ""}
+        ${!hasAddress ? `<div class="note">Add your delivery address under <strong>your details</strong> first.</div>` : ""}
+        <form id="of" novalidate style="margin-top:12px">
+          ${PRODUCTS.map((p) => `<div class="qty"><div><div class="name">${p.label.toLowerCase()}</div><div class="price">${p.k === "white" ? rm(S.price_white) + " per 500g · from 500g" : rm(S["price_" + p.k]) + " per kg · from 1kg"}</div></div>
+            <div class="stepper"><button type="button" data-q="${p.k}" data-d="-1" aria-label="Less ${p.label}">−</button><output id="q-${p.k}" aria-live="polite">0kg</output><button type="button" data-q="${p.k}" data-d="1" aria-label="More ${p.label}">+</button></div></div>`).join("")}
+          <div id="sum"></div>
+          <label class="f">Pay by<select name="pay"><option value="qr">QR when it arrives</option><option value="cash">Cash when it arrives</option></select></label>
+          <label class="f">Note for this order <small>(optional)</small><input name="note" placeholder="${esc(cust.note || "e.g. leave with the guardhouse")}"></label>
+          <div id="omsg"></div>
+          <button class="btn" type="submit" ${!next || !hasAddress ? "disabled" : ""}>Place order</button>
+        </form>
+      </section>
+      <section class="panel tint" aria-labelledby="det-h">
+        <h2 id="det-h">your details</h2>
+        <p class="sub">Riders use these to find you.</p>
+        <form id="df" novalidate style="margin-top:16px">
+          <label class="f">Name<input name="name" value="${esc(cust.name)}" autocomplete="name"></label>
+          <label class="f">WhatsApp number<input name="phone" type="tel" value="${esc(cust.phone)}" autocomplete="tel"></label>
+          <label class="f">Building or street<input name="address" value="${esc(cust.address)}" placeholder="e.g. 11 Mont Kiara, Jalan Kiara" autocomplete="street-address"></label>
+          <div class="row2"><label class="f">Unit<input name="unit" value="${esc(cust.unit)}" placeholder="e.g. B-18-2"></label>
+          <label class="f">Area<select name="zone"><option value="">Choose</option>${(S.zones || []).map((z) => `<option ${z.name === cust.zone ? "selected" : ""} value="${esc(z.name)}">${esc(z.name)} – ${esc(z.areas)}</option>`).join("")}</select></label></div>
+          <label class="f">Delivery note <small>(where to leave it if you are out)</small><input name="note" value="${esc(cust.note)}" placeholder="e.g. Parcel room, send a photo"></label>
+          <div id="dmsg"></div>
+          <button class="btn btn-quiet" type="submit">Save details</button>
+        </form>
+      </section>
+    </div>
+    <section style="margin-top:36px" aria-labelledby="hist-h">
+      <h2 id="hist-h">your orders</h2>
+      ${orders.length ? `<ul class="list" style="margin-top:14px">${orders.map(orderRow).join("")}</ul>` : `<p class="empty">No orders yet. Your first one will show up here.</p>`}
+    </section>`;
+  $$("[data-q]").forEach((b) => (b.onclick = () => step(b.dataset.q, +b.dataset.d)));
+  $("#of").onsubmit = placeOrder;
+  $("#df").onsubmit = saveDetails;
+  $$("[data-cancel]").forEach((b) => (b.onclick = () => cancel(b.dataset.cancel, b)));
+  updateSum();
+}
+function orderRow(o) {
+  const canCancel = o.status === "new" && next && o.delivery_date >= next;
+  return `<li class="item"><div><div class="t">${fmtDate(o.delivery_date, true)}</div>
+    <div>${esc(itemsText(o))}</div><div class="m">${esc(packText(o))}</div></div>
+    <div><div class="amt">${rm(o.total)}</div><div style="text-align:right;margin-top:4px">${statusChip(o)}</div></div>
+    <div class="acts"><span class="m">${o.fee > 0 ? "Includes " + rm(o.fee) + " delivery" : "Free delivery"} · ${o.paid ? "Paid" : PAY[o.pay]}</span>
+    ${canCancel ? `<button class="linkbtn danger" data-cancel="${o.id}">Cancel this order</button>` : ""}</div></li>`;
+}
+function step(k, d) {
+  let v = qty[k] + d * 0.5;
+  if (d > 0 && qty[k] === 0) v = MIN[k];
+  if (d < 0 && v < MIN[k]) v = 0;
+  qty[k] = Math.max(0, Math.min(50, v));
+  updateSum();
+}
+function updateSum() {
+  for (const p of PRODUCTS) $("#q-" + p.k).textContent = kgf(qty[p.k]);
+  const pr = priceOf(qty, S);
+  $("#sum").innerHTML = pr.kg ? `<div class="total"><div><div>${kgf(pr.kg)} · ${esc(packText(qty))}</div>
+    <div class="sub">${pr.fee ? `Includes ${rm(pr.fee)} delivery. Add ${kgf(S.free_from_kg - pr.kg)} more for free delivery.` : "Free delivery"}</div></div><div class="big">${rm(pr.total)}</div></div>`
+    : `<p class="sub" style="margin:14px 0">Tap + to add strawberries. Free delivery from ${kgf(S.free_from_kg)}.</p>`;
+}
+async function placeOrder(e) {
+  e.preventDefault();
+  const fd = new FormData(e.target), errs = validateQty(qty), btn = e.submitter || $("#of button[type=submit]");
+  if (errs.length) return ($("#omsg").innerHTML = `<div class="err">${errs.map(esc).join("<br>")}</div>`);
+  btn.disabled = true;
+  try {
+    const o = await API.placeOrder({ customer_id: cust.id, delivery_date: next, mixed: qty.mixed, big: qty.big, white: qty.white, pay: fd.get("pay"), note: String(fd.get("note") || "").trim() });
+    orders.unshift(o); qty.mixed = qty.big = qty.white = 0;
+    render(); toast("Order placed for " + fmtDate(next));
+  } catch (err) { $("#omsg").innerHTML = `<div class="err">${esc(err.message)}</div>`; btn.disabled = false; }
+}
+async function saveDetails(e) {
+  e.preventDefault();
+  const fd = new FormData(e.target), v = (k) => String(fd.get(k) || "").trim(), btn = e.submitter || $("#df button");
+  if (!v("name")) return ($("#dmsg").innerHTML = `<div class="err">Add your name.</div>`);
+  if (v("address").length < 3) return ($("#dmsg").innerHTML = `<div class="err">Add your building or street so riders can find you.</div>`);
+  btn.disabled = true;
+  try { cust = await API.updateMyCustomer(cust.id, { name: v("name"), phone: v("phone"), address: v("address"), unit: v("unit"), zone: v("zone"), note: v("note") }); render(); toast("Details saved"); }
+  catch (err) { $("#dmsg").innerHTML = `<div class="err">${esc(err.message)}</div>`; btn.disabled = false; }
+}
+async function cancel(id, btn) {
+  if (btn.dataset.sure !== "1") { btn.dataset.sure = "1"; btn.textContent = "Tap again to cancel"; return; }
+  try { await API.cancelOrder(id); const o = orders.find((x) => x.id === id); if (o) o.status = "cancelled"; render(); toast("Order cancelled"); }
+  catch (err) { toast(err.message); }
+}
+</script>
+</body>
+</html>
