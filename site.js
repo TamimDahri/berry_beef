@@ -1,7 +1,7 @@
 // Your WhatsApp number, country code first, digits only (e.g. 60123456789).
-const WHATSAPP_NUMBER = "60XXXXXXXXX";
+const WHATSAPP_NUMBER = "60133847729";
 
-const ORDER_TEMPLATE = `Hi Berry Beef, I'd like to order for Wednesday.
+const ORDER_TEMPLATE = `Hi Cameron Strawberry, I'd like to order for Wednesday.
 
 Name:
 Phone:
