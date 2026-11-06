@@ -1,133 +1,179 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Berry Beef - Fresh Meal Kits in Malaysia</title>
-    <link rel="stylesheet" href="styles.css">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Berry Beef – Cameron Highlands strawberries delivered in KL every Wednesday</title>
+<meta name="description" content="Fresh Cameron Highlands strawberries delivered to your door every Wednesday, from Damansara to Ampang. Mixed RM40/kg, big RM50/kg, white RM35/500g. Since 2020.">
+<meta property="og:title" content="Berry Beef – Cameron Highlands strawberries, every Wednesday">
+<meta property="og:description" content="Delivered to your door from Damansara to Ampang. Order by Monday 10pm.">
+<meta property="og:image" content="https://cameronstrawberry.com/images/2kg-box.jpg">
+<meta name="theme-color" content="#F0585F">
+<link rel="icon" href="images/logo-mark.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Figtree:wght@700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="site.css">
 </head>
 <body>
-    <header>
-        <nav>
-            <div class="logo">
-                <img src="/images/berry-beef-logo.png" alt="Berry Beef Logo">
-            </div>
-            <ul>
-                <li><a href="#home">Home</a></li>
-                <li><a href="#meal-plans">Meal Plans</a></li>
-                <li><a href="#how-it-works">How It Works</a></li>
-                <li><a href="#about">About Us</a></li>
-                <li><a href="#contact">Contact</a></li>
-            </ul>
-            <div class="nav-buttons">
-                <button class="login-btn">Login</button>
-                <button class="signup-btn">Sign Up</button>
-            </div>
-        </nav>
-    </header>
+<a class="skip" href="#main">Skip to content</a>
 
-    <main>
-        <section id="home" class="hero">
-            <div class="hero-content">
-                <h1>Fresh Local Meal Kits</h1>
-                <h2>Bringing Malaysian Flavors to Your Kitchen</h2>
-                <p>Locally sourced ingredients. Chef-designed recipes. Delivered fresh.</p>
-                <button class="cta-btn">Get Started</button>
-            </div>
-            <div class="hero-image">
-                <img src="/images/meal-kit-hero.jpg" alt="Berry Beef Meal Kit">
-            </div>
-        </section>
+<header class="top">
+  <a class="brand" href="#" aria-label="Berry Beef home">
+    <svg class="mark" viewBox="0 0 64 72" aria-hidden="true"><use href="#punnet"/></svg>
+    <span>berry<br>beef</span>
+  </a>
+  <nav aria-label="Main">
+    <a href="#prices">Prices</a>
+    <a href="#week">How the week works</a>
+    <a href="#areas">Areas</a>
+    <a href="#questions">Questions</a>
+  </nav>
+  <a class="btn btn-small" data-wa href="#">Order on WhatsApp</a>
+</header>
 
-        <section id="meal-plans" class="meal-plans">
-            <h2>Our Meal Plans</h2>
-            <div class="plan-grid">
-                <div class="plan-card">
-                    <h3>Traditional Malaysian</h3>
-                    <p>Local recipes with fresh ingredients</p>
-                    <ul>
-                        <li>3 Meals per Week</li>
-                        <li>Serves 2-4 People</li>
-                        <li>Halal Certified</li>
-                    </ul>
-                    <button>Select Plan</button>
-                </div>
-                <div class="plan-card">
-                    <h3>Healthy Lifestyle</h3>
-                    <p>Nutritionist-approved meals</p>
-                    <ul>
-                        <li>4 Meals per Week</li>
-                        <li>Low Carb Options</li>
-                        <li>Fresh Local Produce</li>
-                    </ul>
-                    <button>Select Plan</button>
-                </div>
-                <div class="plan-card">
-                    <h3>Quick Cook</h3>
-                    <p>30-minute meal solutions</p>
-                    <ul>
-                        <li>2 Meals per Week</li>
-                        <li>Easy Preparation</li>
-                        <li>Perfect for Busy Professionals</li>
-                    </ul>
-                    <button>Select Plan</button>
-                </div>
-            </div>
-        </section>
+<main id="main">
+  <section class="hero">
+    <div class="hero-copy">
+      <h1>cameron highlands strawberries, at your door every wednesday.</h1>
+      <p class="lede">Packed at the farm, sent down to KL by bus, and brought to your door the same evening by our riders. Delivering from Damansara to Ampang since 2020.</p>
+      <div class="actions">
+        <a class="btn" data-wa href="#">Order on WhatsApp</a>
+        <a class="btn btn-quiet" href="#prices">See prices</a>
+      </div>
+    </div>
 
-        <section id="how-it-works" class="how-it-works">
-            <h2>How Berry Beef Works</h2>
-            <div class="steps">
-                <div class="step">
-                    <i class="fas fa-shopping-cart"></i>
-                    <h3>Choose Your Plan</h3>
-                    <p>Select from our curated meal plans</p>
-                </div>
-                <div class="step">
-                    <i class="fas fa-truck"></i>
-                    <h3>We Deliver</h3>
-                    <p>Fresh ingredients arrive weekly</p>
-                </div>
-                <div class="step">
-                    <i class="fas fa-utensils"></i>
-                    <h3>You Cook</h3>
-                    <p>Easy-to-follow recipes included</p>
-                </div>
-            </div>
-        </section>
+    <div class="punnet-wrap" aria-label="Next delivery">
+      <svg class="leaf" viewBox="0 0 120 120" aria-hidden="true"><path d="M8 8 L60 32 L112 8 L112 112 L8 112 Z" fill="#8AC45C" stroke="#000" stroke-width="12" stroke-linejoin="miter"/></svg>
+      <div class="punnet">
+        <span class="cell"></span><span class="cell"></span><span class="cell"></span>
+        <span class="cell"></span>
+        <div class="cell centre" id="nextdrop">
+          <p class="nd-label">Next delivery</p>
+          <p class="nd-day" id="nd-day">Wednesday</p>
+          <p class="nd-cut" id="nd-cut">Order by Monday, 10pm</p>
+          <p class="nd-left" id="nd-left"></p>
+        </div>
+        <span class="cell"></span>
+        <span class="cell"></span><span class="cell"></span><span class="cell"></span>
+      </div>
+    </div>
+  </section>
 
-        <footer>
-            <div class="footer-content">
-                <div class="footer-section">
-                    <h4>Quick Links</h4>
-                    <ul>
-                        <li>Home</li>
-                        <li>Meal Plans</li>
-                        <li>About Us</li>
-                        <li>Contact</li>
-                    </ul>
-                </div>
-                <div class="footer-section">
-                    <h4>Contact Us</h4>
-                    <p>Email: hello@berrybeef.com</p>
-                    <p>Phone: +60 123-456-7890</p>
-                </div>
-                <div class="footer-section">
-                    <h4>Follow Us</h4>
-                    <div class="social-icons">
-                        <i class="fab fa-facebook"></i>
-                        <i class="fab fa-instagram"></i>
-                        <i class="fab fa-twitter"></i>
-                    </div>
-                </div>
-            </div>
-            <div class="copyright">
-                © 2024 Berry Beef. All Rights Reserved.
-            </div>
-        </footer>
-    </main>
+  <section class="prices" id="prices" aria-labelledby="prices-h">
+    <div class="prices-head">
+      <h2 id="prices-h">what it costs</h2>
+      <p>You pay by QR or cash when your strawberries arrive. No deposit, no subscription.</p>
+    </div>
+    <div class="prices-body">
+      <div class="board">
+        <div class="row">
+          <div><h3>mixed size</h3><p>Small, medium and large together. The everyday choice for snacking and smoothies.</p></div>
+          <p class="price"><span class="rm">RM</span>40<span class="per">/kg</span></p>
+        </div>
+        <div class="row">
+          <div><h3>big</h3><p>The largest berries, picked out by the farm. For guests, gifts and dessert plates.</p></div>
+          <p class="price"><span class="rm">RM</span>50<span class="per">/kg</span></p>
+        </div>
+        <div class="row row-white">
+          <div><h3>white</h3><p>A pale variety grown in Cameron Highlands. Sold by the 500g pack.</p></div>
+          <p class="price"><span class="rm">RM</span>35<span class="per">/500g</span></p>
+        </div>
+      </div>
+      <figure class="packs">
+        <img src="images/500g-packs.jpg" width="410" height="340" alt="Four clear 500g packs of red strawberries stacked on a wooden stool" loading="lazy">
+        <figcaption>Four 500g packs make 2kg. Every full 2kg in your order comes as one farm box instead.</figcaption>
+      </figure>
+    </div>
+    <ul class="rules">
+      <li><strong>Minimum 1kg</strong> for mixed and big, then add 500g at a time: 1.5kg, 2kg, 2.5kg.</li>
+      <li><strong>White starts at 500g.</strong></li>
+      <li><strong>Free delivery from 2kg.</strong> Any mix counts, so 1kg mixed and 1kg white is free. Under 2kg, delivery is RM5.</li>
+    </ul>
+  </section>
 
-    <script src="app.js"></script>
+  <section class="week" id="week" aria-labelledby="week-h"><div class="inner">
+    <h2 id="week-h">how the week works</h2>
+    <p class="week-intro">One delivery day, so nothing sits in a warehouse. We only order from the farm what you have ordered from us.</p>
+    <ol class="route">
+      <li><span class="day">By Monday, 10pm</span><span class="what">Send us your order on WhatsApp.</span></li>
+      <li><span class="day">Tuesday</span><span class="what">We send your order to the farm in Cameron Highlands.</span></li>
+      <li><span class="day">Wednesday</span><span class="what">The farm packs it and a bus brings it down to Terminal Bersepadu Selatan.</span></li>
+      <li class="arrive"><span class="day">Wednesday, 3pm to 9pm</span><span class="what">Our riders pick it up at the terminal and bring it to your door.</span></li>
+    </ol>
+  </div></section>
+
+  <section class="door" aria-labelledby="door-h">
+    <figure>
+      <img src="images/doorstep-box.jpg" width="600" height="720" alt="An open farm box full of red strawberries left on a stool at a front door" loading="lazy">
+    </figure>
+    <div class="door-copy">
+      <h2 id="door-h">this is what lands at your door.</h2>
+      <p>A 2kg order arrives in the farm's own box, the way it left Cameron Highlands. Nothing is repacked or sorted again in KL.</p>
+      <p>Not home? Tell us where to leave it: with the guardhouse, in the parcel room or at the lobby. Ask and your rider will send a photo once it is there.</p>
+    </div>
+  </section>
+
+  <section class="areas" id="areas" aria-labelledby="areas-h"><div class="inner">
+    <h2 id="areas-h">where we deliver</h2>
+    <p class="areas-intro">From Damansara in the west to Ampang in the east.</p>
+    <ul class="places">
+      <li>Desa ParkCity</li><li>KL Metropolis</li><li>Mont Kiara</li><li>Sri Hartamas</li><li>Bukit Kiara</li>
+      <li>Damansara Heights</li><li>Bukit Ledang</li><li>Bangsar</li><li>Bangsar South</li><li>Seputeh</li>
+      <li>KL city</li><li>KLCC</li><li>Bukit Bintang</li><li>Bukit Ceylon</li><li>Ampang</li>
+    </ul>
+    <p class="areas-note">Somewhere else in the Klang Valley? Send us your address and we will tell you if a rider can reach you.</p>
+  </div></section>
+
+  <section class="faq" id="questions" aria-labelledby="faq-h">
+    <h2 id="faq-h">questions</h2>
+    <details>
+      <summary>How do I order?</summary>
+      <p>Tap <strong>Order on WhatsApp</strong>. A message opens with the details we need: your name, address and unit, and how many kilos of each kind. Send it before Monday, 10pm and we confirm by WhatsApp.</p>
+    </details>
+    <details>
+      <summary>How do I pay?</summary>
+      <p>By QR or cash when your strawberries arrive. The rider tells you the amount.</p>
+    </details>
+    <details>
+      <summary>Can I order the same thing every week?</summary>
+      <p>Yes. Tell us your usual order once and we keep your address and unit on file, so next time you only need to say "same as last week".</p>
+    </details>
+    <details>
+      <summary>Why only on Wednesdays?</summary>
+      <p>Strawberries are best within a day or two of picking. One delivery day means we order exactly what was ordered from us, and you get it the day it comes down from the farm.</p>
+    </details>
+    <details>
+      <summary>Something was wrong with my strawberries.</summary>
+      <p>Send us a photo on WhatsApp the same day so we can sort it out.</p>
+    </details>
+  </section>
+
+  <section class="cta" aria-labelledby="cta-h">
+    <div class="cta-inner">
+      <h2 id="cta-h">want some this wednesday?</h2>
+      <p id="cta-cut">Orders close Monday at 10pm.</p>
+      <a class="btn btn-invert" data-wa href="#">Order on WhatsApp</a>
+    </div>
+  </section>
+</main>
+
+<footer class="foot">
+  <div class="foot-brand">
+    <svg class="mark" viewBox="0 0 64 72" aria-hidden="true"><use href="#punnet"/></svg>
+    <p><strong>Berry Beef</strong><br>Cameron Highlands strawberries, delivered in Kuala Lumpur since 2020.</p>
+  </div>
+  <p class="legal">Berry Beef is a brand of Neo Trade Ventures, registered with SSM.<br>© <span id="year">2026</span> Neo Trade Ventures</p>
+</footer>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="punnet" viewBox="0 0 64 72">
+    <path d="M3 3 L13 7.5 L23 3 L23 22 L3 22 Z" fill="#8AC45C" stroke="#000" stroke-width="4" stroke-linejoin="miter"/>
+    <rect x="3" y="20" width="58" height="49" rx="9" fill="#F0585F" stroke="#000" stroke-width="4.5"/>
+    <rect x="23.7" y="36" width="16.6" height="17" fill="#fff"/>
+    <path d="M22.3 20v49M41.7 20v49M3 36.3h58M3 52.7h58" stroke="#000" stroke-width="4.5"/>
+  </symbol>
+</svg>
+<script src="site.js"></script>
 </body>
 </html>
