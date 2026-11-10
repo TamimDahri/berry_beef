@@ -66,6 +66,11 @@
     async farmPrices(farmId, limit = 30) { return ok(await sb.from("farm_prices").select("*").eq("farm_id", farmId).order("price_date", { ascending: false }).limit(limit)); },
     async farmOrder(farmId, date) { return ok(await sb.from("farm_orders").select("*").eq("farm_id", farmId).eq("delivery_date", date).maybeSingle()); },
     async farmTotals(date) { return ok(await sb.rpc("admin_farm_totals", { d: date })); },
+    async carriers() { return ok(await sb.from("carriers").select("*").order("created_at")); },
+    async saveCarrier(c) { const { id, created_at, ...rest } = c; if (id) return ok(await sb.from("carriers").update(rest).eq("id", id).select().single()); return ok(await sb.from("carriers").insert(rest).select().single()); },
+    async shipments(date) { return ok(await sb.from("shipments").select("*").eq("delivery_date", date).order("created_at")); },
+    async saveShipment(s) { const { id, created_at, ...rest } = s; if (id) return ok(await sb.from("shipments").update(rest).eq("id", id).select().single()); return ok(await sb.from("shipments").insert(rest).select().single()); },
+    async deleteShipment(id) { ok(await sb.from("shipments").delete().eq("id", id)); },
     async week(date) { return ok(await sb.from("weeks").select("*").eq("delivery_date", date).maybeSingle()); },
     async saveWeek(w) { return ok(await sb.from("weeks").upsert(w).select().single()); },
   };

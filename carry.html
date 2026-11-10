@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+<title>Pembawa – Cameron Strawberry</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#F0585F">
+<link rel="icon" href="images/logo-mark.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Figtree:wght@700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/app.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/config.js"></script>
+<script src="js/common.js"></script>
+</head>
+<body>
+<header id="apphead"></header>
+<main id="main" class="narrow"><p class="empty">Sedang dimuatkan…</p></main>
+<script>
+const token = new URLSearchParams(location.search).get("k") || "";
+const CA = window.CARRY_API || (() => {
+  const c = window.CS_CONFIG, sb = window.supabase.createClient(c.SUPABASE_URL, c.SUPABASE_ANON_KEY, { auth: { persistSession: false } });
+  const call = async (fn, args) => { const { data, error } = await sb.rpc(fn, args); if (error) throw new Error(error.message); return data; };
+  return { view: () => call("carrier_view", { p_token: token }), update: (id, action, note) => call("carrier_update", { p_token: token, p_id: id, p_action: action, p_note: note }) };
+})();
+let V;
+$("#apphead").innerHTML = `<span class="brand">${MARK}<span>cameron<br>strawberry</span></span><span class="where">Pembawa</span>`;
+const owner = CS_CONFIG.WHATSAPP_NUMBER;
+const masa = (ts) => new Date(ts).toLocaleString("ms-MY", { timeZone: "Asia/Kuala_Lumpur", weekday: "long", hour: "numeric", minute: "2-digit" });
+const muatan = (t) => [["Campur", t.mixed_box, t.mixed_pack], ["Besar", t.big_box, t.big_pack], ["Putih", 0, t.white_pack]].filter(([, b, p]) => b || p)
+  .map(([n, b, p]) => `<li class="item"><div class="t">${n}</div><div class="amt">${[b ? b + " kotak 2kg" : "", p ? p + " pek 500g" : ""].filter(Boolean).join(" + ")}</div></li>`).join("");
+const STEP = { assigned: ["Menunggu jawapan anda", "a"], accepted: ["Anda setuju", "g"], declined: ["Anda tolak", "r"], picked_up: ["Sudah ambil di ladang", "a"], delivered: ["Sudah hantar", "g"], received: ["Kami sudah terima", "g"] };
+
+async function load() {
+  try { V = await CA.view(); render(); }
+  catch (e) { $("#main").innerHTML = `<div class="panel"><h1>pautan tidak sah.</h1><p class="sub">Minta pautan baru daripada Cameron Strawberry melalui WhatsApp.</p></div>`; }
+}
+function render() {
+  const trips = V.trips;
+  $("#main").innerHTML = `<h1>salam ${esc(V.carrier.name.toLowerCase())}.</h1>
+    <p class="sub">Terima kasih kerana membantu bawa strawberi dari Cameron Highlands. Ada soalan? <a href="https://wa.me/${owner}" target="_blank" rel="noopener">WhatsApp kami</a>.</p>
+    ${trips.length ? trips.map(trip).join("") : `<div class="panel" style="margin-top:22px"><p class="empty">Tiada trip buat masa ini. Kami akan WhatsApp anda jika perlukan bantuan.</p></div>`}`;
+  $$("[data-act]").forEach((b) => (b.onclick = () => act(b.dataset.id, b.dataset.act, b)));
+}
+function trip(t) {
+  const [label, cls] = STEP[t.status] || ["", ""], f = V.farm;
+  const next = { assigned: [["accept", "Ya, saya boleh bawa", ""], ["decline", "Maaf, tak dapat", "btn-quiet"]], accepted: [["picked_up", "Sudah ambil di ladang", ""], ["decline", "Batal, tak dapat bawa", "btn-quiet"]], declined: [["accept", "Sebenarnya saya boleh", "btn-quiet"]], picked_up: [["delivered", "Sudah hantar", "btn-green"]] }[t.status] || [];
+  return `<section class="panel ${t.status === "delivered" || t.status === "received" ? "" : "tint"}" style="margin-top:22px">
+    <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap"><h2>${esc(fmtDateBM(t.delivery_date))}</h2>${chip(label, cls)}</div>
+    <h3 style="margin-top:14px">ambil di ladang</h3>
+    <p>${f ? `<strong>${esc(f.name)}</strong>${f.phone ? ` · <a href="https://wa.me/${waPhone(f.phone)}" target="_blank" rel="noopener">WhatsApp ladang</a>` : ""}` : "Kami akan maklumkan lokasi ladang."}</p>
+    <ul class="list" style="margin-top:10px">${muatan(t)}</ul>
+    <p class="sub">Kira kotak dan pek sebelum bertolak. Letak di tempat teduh dalam kereta, jangan tindih kotak.</p>
+    <h3 style="margin-top:14px">hantar ke</h3>
+    <p><strong>${esc(t.dropoff)}</strong>${t.meet_time ? `<br>${esc(t.meet_time)}` : ""}</p>
+    <p style="margin-top:6px"><a href="${esc(mapsSearch(t.dropoff))}" target="_blank" rel="noopener">Buka dalam Maps</a></p>
+    ${t.admin_note ? `<div class="note">${esc(t.admin_note)}</div>` : ""}
+    <p style="margin-top:12px">Bayaran: <strong>${rm(t.fee)}</strong> ${t.paid ? chip("Sudah dibayar", "g") : ""}</p>
+    ${t.picked_at ? `<p class="sub">Diambil ${esc(masa(t.picked_at))}.</p>` : ""}${t.delivered_at ? `<p class="sub">Dihantar ${esc(masa(t.delivered_at))}.</p>` : ""}
+    ${next.length ? `<label class="f" style="margin-top:14px">Nota untuk kami <small>(tidak wajib, contoh: 1 kotak penyek)</small><input id="n-${t.id}" value=""></label>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">${next.map(([a, l, c]) => `<button class="btn ${c}" data-act="${a}" data-id="${t.id}">${l}</button>`).join("")}</div>` : ""}
+  </section>`;
+}
+async function act(id, action, btn) {
+  btn.disabled = true;
+  try { await CA.update(id, action, ($("#n-" + id) || {}).value || ""); toast({ accept: "Terima kasih! Trip disahkan.", decline: "Baik, kami maklum.", picked_up: "Direkod: sudah ambil.", delivered: "Direkod: sudah hantar. Terima kasih!" }[action]); await load(); }
+  catch (e) { toast(e.message); btn.disabled = false; }
+}
+load();
+</script>
+</body>
+</html>

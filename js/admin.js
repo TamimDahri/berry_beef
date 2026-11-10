@@ -1,7 +1,7 @@
 // Admin dashboard: orders, customers, riders, farm order, money, team and settings.
-let me, S, date, orders = [], customers = [], profiles = [], week = null, counts = [], farms = [], farmPrices = [], farmConf = null;
+let me, S, date, orders = [], customers = [], profiles = [], week = null, counts = [], farms = [], farmPrices = [], farmConf = null, carriers = [], trips = [];
 const st = { tab: "orders", filter: "all", confirm: null };
-const TABS = [["orders", "Orders"], ["customers", "Customers"], ["riders", "Riders"], ["farm", "Farm & packing"], ["money", "Money"], ["team", "Team"], ["settings", "Settings"]];
+const TABS = [["orders", "Orders"], ["customers", "Customers"], ["riders", "Riders"], ["farm", "Farm & packing"], ["carriers", "Carriers"], ["money", "Money"], ["team", "Team"], ["settings", "Settings"]];
 const WEEK0 = { cost_mixed: 20, cost_big: 32, cost_white: 20, trip: false, trip_cost: 0, collector: "", extra_mixed: 0, extra_big: 0, extra_white: 0 };
 
 (async () => {
@@ -18,10 +18,11 @@ const WEEK0 = { cost_mixed: 20, cost_big: 32, cost_white: 20, trip: false, trip_
 
 async function loadAll() {
   [orders, customers, profiles, week, counts, farms] = await Promise.all([API.orders(date), API.customers(), API.profiles(), API.week(date), API.allOrderCounts(), API.farms().catch(() => [])]);
+  [carriers, trips] = await Promise.all([API.carriers().catch(() => []), API.shipments(date).catch(() => [])]);
   await loadFarm();
   render();
 }
-async function loadDay() { [orders, week] = await Promise.all([API.orders(date), API.week(date)]); await loadFarm(); render(); }
+async function loadDay() { [orders, week, trips] = await Promise.all([API.orders(date), API.week(date), API.shipments(date).catch(() => [])]); await loadFarm(); render(); }
 async function loadFarm() {
   const f = farms.find((x) => x.active) || farms[0];
   if (!f) { farmPrices = []; farmConf = null; return; }
@@ -43,10 +44,10 @@ function render() {
   const t = st.tab;
   $("#main").innerHTML = `
     <div class="toolbar"><div><h1>${t === "customers" || t === "team" || t === "settings" ? esc(TABS.find((x) => x[0] === t)[1].toLowerCase()) : fmtDate(date, true).toLowerCase()}</h1>
-      ${["orders", "riders", "farm", "money"].includes(t) ? `<p class="sub">Orders close ${cutoffText(date, S)}.</p>` : ""}</div>
-      ${["orders", "riders", "farm", "money"].includes(t) ? `<label class="f" style="margin-left:auto">Delivery day<input type="date" id="date" value="${date}"></label>` : ""}</div>
+      ${["orders", "riders", "farm", "carriers", "money"].includes(t) ? `<p class="sub">Orders close ${cutoffText(date, S)}.</p>` : ""}</div>
+      ${["orders", "riders", "farm", "carriers", "money"].includes(t) ? `<label class="f" style="margin-left:auto">Delivery day<input type="date" id="date" value="${date}"></label>` : ""}</div>
     <nav class="tabs" aria-label="Admin sections">${TABS.map(([k, l]) => `<a href="#${k}" class="${k === t ? "on" : ""}">${l}</a>`).join("")}</nav>
-    <div id="view">${({ orders: vOrders, customers: vCustomers, riders: vRiders, farm: vFarm, money: vMoney, team: vTeam, settings: vSettings })[t]()}</div>`;
+    <div id="view">${({ orders: vOrders, customers: vCustomers, riders: vRiders, farm: vFarm, carriers: vCarriers, money: vMoney, team: vTeam, settings: vSettings })[t]()}</div>`;
   const d = $("#date"); if (d) d.onchange = (e) => { if (e.target.value) { date = e.target.value; history.replaceState(null, "", "?date=" + date + location.hash); loadDay(); } };
 }
 
@@ -321,9 +322,11 @@ function vMoney() {
   const w = W(), l = live(), kg = l.reduce((a, o) => a + num(o.total_kg), 0);
   const sales = l.reduce((a, o) => a + num(o.subtotal), 0), fees = l.reduce((a, o) => a + num(o.fee), 0);
   const farm = (o) => num(o.mixed) * w.cost_mixed + num(o.big) * w.cost_big + num(o.white) * 2 * w.cost_white;
-  const farmT = l.reduce((a, o) => a + farm(o), 0), trans = w.trip ? num(w.trip_cost) : kg * (num(S.runner_per_kg) + num(S.bus_per_kg)), ridersT = l.length * num(S.rider_per_drop);
+  const tr = liveTrips(), carriedKg = Math.min(kg, tr.reduce((a, x) => a + tripKg(x), 0)), carrierFees = tr.reduce((a, x) => a + num(x.fee), 0);
+  const busKg = Math.max(0, kg - carriedKg);
+  const farmT = l.reduce((a, o) => a + farm(o), 0), trans = (w.trip ? num(w.trip_cost) : busKg * (num(S.runner_per_kg) + num(S.bus_per_kg))) + carrierFees, ridersT = l.length * num(S.rider_per_drop);
   const rev = sales + fees, cost = farmT + trans + ridersT, profit = rev - cost;
-  const per = l.map((o) => ({ o, p: num(o.total) - farm(o) - (w.trip ? (kg ? num(w.trip_cost) * num(o.total_kg) / kg : 0) : num(o.total_kg) * (num(S.runner_per_kg) + num(S.bus_per_kg))) - num(S.rider_per_drop) }));
+  const per = l.map((o) => ({ o, p: num(o.total) - farm(o) - (kg ? trans * num(o.total_kg) / kg : 0) - num(S.rider_per_drop) }));
   const losing = per.filter((x) => x.p < 0);
   const by = { online: 0, qr: 0, cash: 0 }; let unpaid = 0; for (const o of l) { if (o.paid) by[o.pay] += num(o.total); else unpaid += num(o.total); }
   return `${losing.length ? `<div class="note">${losing.length} order${losing.length > 1 ? "s lose" : " loses"} money at this week's farm price: ${losing.map((x) => esc(x.o.name) + " (" + rm(x.p) + ")").join(", ")}.</div>` : ""}
@@ -331,12 +334,87 @@ function vMoney() {
       <div class="kpi"><div class="l">Profit</div><div class="v" style="color:${profit < 0 ? "var(--red-deep)" : "var(--leaf-deep)"}">${rm(profit)}</div></div><div class="kpi"><div class="l">Profit per kg</div><div class="v">${kg ? rm(profit / kg) : "–"}</div></div></div>
     <div class="grid2"><section class="panel"><h2>breakdown</h2><table style="margin-top:10px"><tbody>
       <tr><td>Strawberry sales (${kgf(kg)})</td><td class="n">${rm(sales)}</td></tr><tr><td>Delivery fees</td><td class="n">${rm(fees)}</td></tr>
-      <tr><td>Farm cost</td><td class="n">−${rm(farmT)}</td></tr><tr><td>${w.trip ? "Cameron trip" : "Runner and bus"}</td><td class="n">−${rm(trans)}</td></tr>
+      <tr><td>Farm cost</td><td class="n">−${rm(farmT)}</td></tr><tr><td>${w.trip ? "Cameron trip" : `Runner and bus (${kgf(busKg)})`}${carrierFees ? ` and carriers (${kgf(carriedKg)})` : ""}</td><td class="n">−${rm(trans)}</td></tr>
       <tr><td>Rider pay (${l.length} drops)</td><td class="n">−${rm(ridersT)}</td></tr></tbody><tfoot><tr><th>Profit</th><th class="n">${rm(profit)}</th></tr></tfoot></table></section>
     <section class="panel"><h2>payments</h2><table style="margin-top:10px"><tbody><tr><td>Paid online</td><td class="n">${rm(by.online)}</td></tr><tr><td>Paid by QR</td><td class="n">${rm(by.qr)}</td></tr><tr><td>Paid cash</td><td class="n">${rm(by.cash)}</td></tr></tbody>
       <tfoot><tr><th>Still unpaid</th><th class="n">${rm(unpaid)}</th></tr></tfoot></table>
       ${l.filter((o) => !o.paid).length ? `<p class="sub" style="margin-top:10px">Unpaid: ${l.filter((o) => !o.paid).map((o) => esc(o.name)).join(", ")}</p>` : ""}</section></div>
     <p class="sub" style="margin-top:14px">Farm prices come from Farm &amp; packing. Cancelled orders are left out.</p>`;
+}
+
+/* ---------- carriers ---------- */
+const TRIP = { assigned: ["Waiting for reply", "a"], accepted: ["Accepted", "g"], declined: ["Declined", "r"], picked_up: ["Picked up at farm", "a"], delivered: ["Handed over", "g"], received: ["Received", "g"], cancelled: ["Cancelled", "r"] };
+const liveTrips = () => trips.filter((x) => !["cancelled", "declined"].includes(x.status));
+const tripKg = (x) => (num(x.mixed_box) + num(x.big_box)) * 2 + (num(x.mixed_pack) + num(x.big_pack) + num(x.white_pack)) * 0.5;
+const tripLoad = (x) => [["Mixed", x.mixed_box, x.mixed_pack], ["Big", x.big_box, x.big_pack], ["White", 0, x.white_pack]].filter(([, b, p]) => b || p).map(([n, b, p]) => n + " " + [b ? b + " box" + (b > 1 ? "es" : "") : "", p ? p + " pack" + (p > 1 ? "s" : "") : ""].filter(Boolean).join(" + ")).join(", ") || "Nothing yet";
+const carrierLink = (c) => location.origin + "/carry.html?k=" + c.token;
+const at = (ts) => (ts ? new Date(ts).toLocaleString("en-GB", { timeZone: "Asia/Kuala_Lumpur", weekday: "short", hour: "numeric", minute: "2-digit" }) : "");
+function vCarriers() {
+  return `<p class="sub" style="margin-bottom:16px">Drivers you know who can bring stock down when the bus is full or as a backup. Each driver gets a private link to accept a trip and mark it picked up and handed over. Use people you know personally, and keep the fee for a trip they are already making.</p>
+    <section class="panel tint"><div class="toolbar" style="margin:0"><h2>trips for ${fmtDate(date).toLowerCase()}</h2>${carriers.some((c) => c.active) ? `<button class="btn" style="margin-left:auto" onclick="tripDialog()">Assign a trip</button>` : ""}</div>
+      ${trips.length ? `<ul class="list" style="margin-top:12px">${trips.map(tripRow).join("")}</ul>` : `<p class="empty">${carriers.length ? "No trips for this day. Everything comes by bus." : "Add a driver below first."}</p>`}</section>
+    <section class="panel"><div class="toolbar" style="margin:0"><h2>drivers</h2><button class="btn btn-quiet" style="margin-left:auto" onclick="carrierDialog()">Add driver</button></div>
+      ${carriers.length ? `<ul class="list" style="margin-top:12px">${carriers.map(carrierRow).join("")}</ul>` : `<p class="empty">No drivers yet.</p>`}</section>`;
+}
+function carrierRow(c) {
+  const msg = `Salam ${c.name}, ini pautan Cameron Strawberry untuk trip bawa strawberi dari Cameron Highlands. Simpan pautan ini:\n${carrierLink(c)}`;
+  return `<li class="item"><div><div class="t">${esc(c.name)} ${c.active ? "" : chip("Not active", "r")}</div>
+    <div class="m">${esc([c.phone, c.vehicle].filter(Boolean).join(" · "))}</div>${c.note ? `<div class="m">${esc(c.note)}</div>` : ""}</div><div></div>
+    <div class="acts">${c.phone ? `<a class="btn btn-small" target="_blank" rel="noopener" href="https://wa.me/${waPhone(c.phone)}?text=${encodeURIComponent(msg)}">Send link on WhatsApp</a>` : ""}
+      <button class="btn btn-small btn-quiet" onclick="copyText('${carrierLink(c)}',this)">Copy link</button>
+      <button class="btn btn-small btn-quiet" onclick="carrierDialog('${c.id}')">Edit</button>
+      ${st.confirm === "tok" + c.id ? `<button class="linkbtn danger" onclick="newCarrierLink('${c.id}')">Yes, make a new link</button><button class="linkbtn" onclick="st.confirm=null;render()">Keep</button>` : `<button class="linkbtn" onclick="st.confirm='tok${c.id}';render()">New link</button>`}</div></li>`;
+}
+function tripRow(x) {
+  const [label, cls] = TRIP[x.status] || ["", ""], c = carriers.find((y) => y.id === x.carrier_id) || {};
+  const msg = `Salam ${c.name}, boleh tolong bawa strawberi untuk ${fmtDateBM(x.delivery_date)}? Butiran dan butang terima di sini:\n${c.token ? carrierLink(c) : ""}`;
+  const times = [x.accepted_at && "Accepted " + at(x.accepted_at), x.picked_at && "Picked up " + at(x.picked_at), x.delivered_at && "Handed over " + at(x.delivered_at), x.received_at && "Received " + at(x.received_at)].filter(Boolean);
+  return `<li class="item"><div><div class="t">${esc(c.name || "Driver")} ${chip(label, cls)} ${x.paid ? chip("Paid", "g") : ""}</div>
+      <div>${esc(tripLoad(x))} (${kgf(tripKg(x))})</div><div class="m">To ${esc(x.dropoff)}${x.meet_time ? ", " + esc(x.meet_time) : ""}</div>
+      ${times.length ? `<div class="m">${times.map(esc).join(". ")}.</div>` : ""}
+      ${x.carrier_note ? `<div class="note">Driver: ${esc(x.carrier_note)}</div>` : ""}</div>
+    <div class="amt">${rm(x.fee)}</div>
+    <div class="acts">${c.phone && ["assigned", "declined"].includes(x.status) ? `<a class="btn btn-small" target="_blank" rel="noopener" href="https://wa.me/${waPhone(c.phone)}?text=${encodeURIComponent(msg)}">Ask on WhatsApp</a>` : ""}
+      ${["picked_up", "delivered"].includes(x.status) ? `<button class="btn btn-small btn-green" onclick="patchTrip('${x.id}',{status:'received',received_at:new Date().toISOString()})">Mark received</button>` : ""}
+      <button class="btn btn-small btn-quiet" onclick="patchTrip('${x.id}',{paid:${!x.paid}})">${x.paid ? "Mark unpaid" : "Mark paid"}</button>
+      <button class="btn btn-small btn-quiet" onclick="tripDialog('${x.id}')">Edit</button>
+      ${x.status === "cancelled" ? `<button class="linkbtn" onclick="patchTrip('${x.id}',{status:'assigned'})">Restore</button>` : `<button class="linkbtn" onclick="patchTrip('${x.id}',{status:'cancelled'})">Cancel</button>`}</div></li>`;
+}
+async function patchTrip(id, patch) { try { const n = await API.saveShipment({ id, ...patch }); Object.assign(trips.find((x) => x.id === id), n); render(); } catch (e) { toast(e.message); } }
+function tripDialog(id) {
+  const t = farmTotals(), x = id ? trips.find((y) => y.id === id) : { carrier_id: (carriers.find((c) => c.active) || {}).id, mixed_box: t.mixed.box, mixed_pack: t.mixed.packs, big_box: t.big.box, big_pack: t.big.packs, white_pack: t.white.packs, fee: 0, dropoff: S.start_point, meet_time: "", admin_note: "" };
+  const n = (label, k) => `<label class="f">${label}<input name="${k}" type="number" min="0" step="1" value="${num(x[k])}"></label>`;
+  dialog(`<h2>${id ? "edit trip" : "assign a trip"}</h2><p class="sub">${fmtDate(date, true)}. ${id ? "" : "Filled in with this week's full farm order. Lower it if the driver only takes part and the rest comes by bus."}</p>
+    <label class="f" style="margin-top:14px">Driver<select name="carrier_id">${carriers.filter((c) => c.active || c.id === x.carrier_id).map((c) => `<option value="${c.id}" ${c.id === x.carrier_id ? "selected" : ""}>${esc(c.name)}</option>`).join("")}</select></label>
+    <div class="row2">${n("Mixed 2kg boxes", "mixed_box")}${n("Mixed 500g packs", "mixed_pack")}</div>
+    <div class="row3">${n("Big boxes", "big_box")}${n("Big packs", "big_pack")}${n("White packs", "white_pack")}</div>
+    <div class="row2"><label class="f">Fee (RM)<input name="fee" type="number" min="0" step="1" value="${num(x.fee)}"></label><label class="f">Meet time<input name="meet_time" value="${esc(x.meet_time)}" placeholder="e.g. Rabu 3 petang"></label></div>
+    <label class="f">Drop-off<input name="dropoff" value="${esc(x.dropoff)}"></label>
+    <label class="f">Note for the driver<input name="admin_note" value="${esc(x.admin_note)}" placeholder="e.g. Call Tamim when you reach Rawang"></label>`, async (fd) => {
+    const v = (k) => String(fd.get(k) || "").trim(), i = (k) => Math.max(0, Math.round(num(v(k))));
+    const rec = { carrier_id: v("carrier_id"), mixed_box: i("mixed_box"), mixed_pack: i("mixed_pack"), big_box: i("big_box"), big_pack: i("big_pack"), white_pack: i("white_pack"), fee: Math.max(0, num(v("fee"))), meet_time: v("meet_time"), dropoff: v("dropoff") || S.start_point, admin_note: v("admin_note") };
+    if (!rec.carrier_id) return fail("Choose a driver.");
+    if (tripKg(rec) === 0) return fail("Add at least one box or pack.");
+    const saved = await API.saveShipment(id ? { id, ...rec } : { ...rec, delivery_date: date, status: "assigned" });
+    trips = trips.filter((y) => y.id !== saved.id).concat(saved); render(); toast(id ? "Trip updated" : "Trip assigned. Tap Ask on WhatsApp to let the driver know.");
+  });
+}
+function carrierDialog(id) {
+  const c = id ? carriers.find((x) => x.id === id) : { name: "", phone: "", vehicle: "", note: "", active: true };
+  dialog(`<h2>${id ? "edit driver" : "add driver"}</h2>
+    <div class="row2" style="margin-top:14px"><label class="f">Name<input name="name" value="${esc(c.name)}"></label><label class="f">WhatsApp number<input name="phone" type="tel" value="${esc(c.phone)}"></label></div>
+    <label class="f">Car and plate number<input name="vehicle" value="${esc(c.vehicle)}" placeholder="e.g. Perodua Myvi, ABC 1234"></label>
+    <label class="f">Note <small>(only you see this)</small><input name="note" value="${esc(c.note)}" placeholder="e.g. drives down every Wednesday morning"></label>
+    ${id ? `<label class="check"><input type="checkbox" name="active" ${c.active ? "checked" : ""}> Active (can get trips and open the link)</label>` : ""}`, async (fd) => {
+    const v = (k) => String(fd.get(k) || "").trim();
+    if (!v("name")) return fail("Add the driver's name.");
+    const saved = await API.saveCarrier({ ...(id ? { id, active: fd.get("active") === "on" } : {}), name: v("name"), phone: v("phone"), vehicle: v("vehicle"), note: v("note") });
+    carriers = carriers.filter((x) => x.id !== saved.id).concat(saved); render(); toast("Driver saved");
+  });
+}
+async function newCarrierLink(id) {
+  const b = new Uint8Array(24); crypto.getRandomValues(b); const token = [...b].map((x) => x.toString(16).padStart(2, "0")).join("");
+  try { const n = await API.saveCarrier({ id, token }); Object.assign(carriers.find((c) => c.id === id), n); st.confirm = null; render(); toast("New link made. The old link no longer works."); } catch (e) { toast(e.message); }
 }
 
 /* ---------- team ---------- */

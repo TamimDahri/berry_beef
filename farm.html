@@ -26,9 +26,10 @@ const FA = window.FARM_API || (() => {
     view: () => call("farm_view", { p_token: token }),
     savePrice: (p) => call("farm_save_price", { p_token: token, p_mixed: p.mixed, p_big: p.big, p_white: p.white, p_stock_mixed: p.stock_mixed, p_stock_big: p.stock_big, p_stock_white: p.stock_white, p_note: p.note }),
     confirm: (d, note) => call("farm_confirm", { p_token: token, p_date: d, p_note: note }),
+    pickups: (d) => call("farm_pickups", { p_token: token, p_date: d }).catch(() => []),
   };
 })();
-let V;
+let V, PK = [];
 $("#apphead").innerHTML = `<span class="brand">${MARK}<span>cameron<br>strawberry</span></span><span class="where">Ladang</span>`;
 const hariBM = (iso) => fmtDateBM(iso);
 const masa = (ts) => new Date(ts).toLocaleString("ms-MY", { timeZone: "Asia/Kuala_Lumpur", weekday: "long", hour: "numeric", minute: "2-digit" });
@@ -37,7 +38,7 @@ const lines = (t) => [["Campur", t.mixed_box, t.mixed_pack], ["Besar", t.big_box
 const same = (a, b) => ["mixed_box", "mixed_pack", "big_box", "big_pack", "white_pack"].every((k) => num(a[k]) === num(b[k]));
 
 async function load() {
-  try { V = await FA.view(); render(); }
+  try { V = await FA.view(); PK = V.delivery_date && FA.pickups ? await FA.pickups(V.delivery_date) : []; render(); }
   catch (e) { $("#main").innerHTML = `<div class="panel"><h1>pautan tidak sah.</h1><p class="sub">Minta pautan baru daripada Cameron Strawberry melalui WhatsApp.</p></div>`; }
 }
 function render() {
@@ -75,6 +76,9 @@ function render() {
         <p class="sub">Untuk dihantar dengan bas pada ${hariBM(V.delivery_date)}.
         ${V.closed ? "Pesanan sudah ditutup, jumlah ini muktamad." : "Pesanan masih dibuka sehingga " + esc(masa(V.cutoff)) + ", jadi jumlah boleh bertambah."}</p>
         ${hasItems ? `<ul class="list" style="margin-top:14px">${lines(t)}</ul>` : `<p class="empty">Belum ada pesanan lagi.</p>`}
+        ${PK.length ? `<h3 style="margin-top:18px">siapa ambil</h3>${PK.map((p) => `<div class="note" style="color:var(--ink)"><strong>${esc(p.name)}</strong>${p.vehicle ? ", " + esc(p.vehicle) : ""}${p.meet_time ? ". " + esc(p.meet_time) : ""}<br>
+          Ambil: ${esc([["Campur", p.mixed_box, p.mixed_pack], ["Besar", p.big_box, p.big_pack], ["Putih", 0, p.white_pack]].filter(([, b, k]) => b || k).map(([n, b, k]) => n + " " + [b ? b + " kotak" : "", k ? k + " pek" : ""].filter(Boolean).join(" + ")).join(", "))}
+          ${p.phone ? `<br><a href="https://wa.me/${waPhone(p.phone)}" target="_blank" rel="noopener">WhatsApp ${esc(p.phone)}</a>` : ""}${p.status === "picked_up" || p.status === "delivered" || p.status === "received" ? " " + chip("Sudah diambil", "g") : ""}</div>`).join("")}` : ""}
         ${c ? `<div class="${changed ? "note" : "ok"}">${changed ? "Pesanan berubah selepas anda sahkan. Sila semak dan sahkan semula." : "Anda sudah sahkan pesanan ini " + esc(masa(c.at)) + "."}</div>` : ""}
         ${hasItems && (!c || changed) ? `<label class="f" style="margin-top:12px">Nota untuk kami <small>(tidak wajib)</small><input id="cnote" placeholder="contoh: Besar tinggal 4 kotak sahaja"></label>
           <div id="cmsg"></div><button class="btn btn-green" id="conf">Sahkan pesanan</button>` : ""}`}
