@@ -1,5 +1,5 @@
 // Admin dashboard: orders, customers, riders, farm order, money, team and settings.
-let me, S, date, orders = [], customers = [], profiles = [], week = null, counts = [];
+let me, S, date, orders = [], customers = [], profiles = [], week = null, counts = [], farms = [], farmPrices = [], farmConf = null;
 const st = { tab: "orders", filter: "all", confirm: null };
 const TABS = [["orders", "Orders"], ["customers", "Customers"], ["riders", "Riders"], ["farm", "Farm & packing"], ["money", "Money"], ["team", "Team"], ["settings", "Settings"]];
 const WEEK0 = { cost_mixed: 20, cost_big: 32, cost_white: 20, trip: false, trip_cost: 0, collector: "", extra_mixed: 0, extra_big: 0, extra_white: 0 };
@@ -17,12 +17,20 @@ const WEEK0 = { cost_mixed: 20, cost_big: 32, cost_white: 20, trip: false, trip_
 })().catch((e) => { if (!/signed in|wrong role/.test(e.message)) showFatal("Something went wrong: " + e.message); });
 
 async function loadAll() {
-  [orders, customers, profiles, week, counts] = await Promise.all([API.orders(date), API.customers(), API.profiles(), API.week(date), API.allOrderCounts()]);
+  [orders, customers, profiles, week, counts, farms] = await Promise.all([API.orders(date), API.customers(), API.profiles(), API.week(date), API.allOrderCounts(), API.farms().catch(() => [])]);
+  await loadFarm();
   render();
 }
-async function loadDay() { [orders, week] = await Promise.all([API.orders(date), API.week(date)]); render(); }
+async function loadDay() { [orders, week] = await Promise.all([API.orders(date), API.week(date)]); await loadFarm(); render(); }
+async function loadFarm() {
+  const f = farms.find((x) => x.active) || farms[0];
+  if (!f) { farmPrices = []; farmConf = null; return; }
+  try { [farmPrices, farmConf] = await Promise.all([API.farmPrices(f.id, 30), API.farmOrder(f.id, date)]); } catch (e) { farmPrices = []; farmConf = null; }
+}
+// Latest farm price on or before the day we order from the farm (the day before delivery).
+function farmPriceFor(d) { const od = isoDate(new Date(parseISO(d).getTime() - 864e5)); return farmPrices.find((p) => p.price_date <= od) || farmPrices.find((p) => p.price_date <= d) || null; }
 
-const W = () => ({ ...WEEK0, delivery_date: date, collector: me.name || "Owner", ...(week || {}) });
+const W = () => { const fp = farmPriceFor(date); return { ...WEEK0, ...(fp ? { cost_mixed: num(fp.mixed), cost_big: num(fp.big), cost_white: num(fp.white) } : {}), delivery_date: date, collector: me.name || "Owner", ...(week || {}) }; };
 const live = () => orders.filter((o) => o.status !== "cancelled");
 const staff = () => profiles.filter((p) => p.role === "rider" || p.role === "admin");
 const riders = () => profiles.filter((p) => p.role === "rider");
@@ -245,7 +253,7 @@ function farmTotals() {
 function vFarm() {
   const w = W(), t = farmTotals();
   const msg = `Salam, order Cameron Strawberry untuk penghantaran ${fmtDateBM(date)}:\n\n` + PRODUCTS.map((p) => { const x = t[p.k], s = []; if (x.box) s.push(x.box + " kotak 2kg"); if (x.packs) s.push(x.packs + " pek 500g"); return s.length ? `${p.bm}: ${s.join(" + ")}` : null; }).filter(Boolean).join("\n") + "\n\nMohon sahkan kuantiti dan harga. Terima kasih.";
-  return `<div class="grid2"><section class="panel"><h2>what to order</h2><p class="sub">The farm needs this one day before delivery. Every 2kg in an order is a box, the rest are 500g packs.</p>
+  return `${farmSection(t)}<div class="grid2" style="margin-top:20px"><section class="panel"><h2>what to order</h2><p class="sub">The farm needs this one day before delivery. Every 2kg in an order is a box, the rest are 500g packs.</p>
       <table style="margin-top:12px"><thead><tr><th>Product</th><th class="n">Ordered</th><th class="n">2kg boxes</th><th class="n">500g packs</th><th class="n">Extra packs</th></tr></thead><tbody>
       ${PRODUCTS.map((p) => `<tr><td>${p.label}</td><td class="n">${kgf(t[p.k].kg)}</td><td class="n">${p.k === "white" ? "–" : t[p.k].box}</td><td class="n">${t[p.k].packs}</td><td class="n"><input type="number" min="0" step="1" value="${num(w["extra_" + p.k])}" style="width:70px;padding:6px;border:3px solid #000;border-radius:8px;text-align:right" aria-label="Extra ${p.label} packs" onchange="saveWeek({extra_${p.k}: Math.max(0, Math.round(+this.value||0))})"></td></tr>`).join("")}</tbody></table>
       <div data-copybox style="margin-top:16px"><textarea class="msg" readonly>${esc(msg)}</textarea><button class="btn btn-small btn-quiet" style="margin-top:8px" onclick="copyText(this.parentNode.querySelector('textarea').value,this)">Copy message for the farm</button></div></section>
@@ -258,6 +266,53 @@ function vFarm() {
       <label class="f">Who collects at TBS<input value="${esc(w.collector)}" list="collectors" onchange="saveWeek({collector:this.value.trim()})"></label>
       <datalist id="collectors"><option value="${esc(me.name || "Owner")}"></option><option value="Both riders"></option>${riders().map((r) => `<option value="${esc(r.name)}"></option>`).join("")}</datalist></section></div>
     <section class="panel" style="margin-top:20px"><h2>packing list</h2>${live().length ? `<table style="margin-top:10px"><thead><tr><th>Customer</th><th>Area</th><th>Pack</th><th>Rider</th></tr></thead><tbody>${live().map((o) => `<tr><td>${esc(o.name)}${o.unit ? " (" + esc(o.unit) + ")" : ""}</td><td>${esc(o.zone)}</td><td>${esc(packText(o))}</td><td>${esc(o.rider_id ? staffName(o.rider_id) : "–")}</td></tr>`).join("")}</tbody></table>` : `<p class="empty">No orders yet.</p>`}</section>`;
+}
+function farmLink(f) { return location.origin + "/farm.html?k=" + f.token; }
+function farmSection(t) {
+  const f = farms.find((x) => x.active) || farms[0];
+  if (!f) return `<section class="panel tint"><h2>your farm</h2><p class="sub">Add the farm to give the farmer a private link. She enters her prices and confirms your order there, and her price fills in this week's costs.</p>
+    <form onsubmit="event.preventDefault();addFarm(new FormData(this))" style="margin-top:14px"><div class="row2"><label class="f">Farm name<input name="name" placeholder="e.g. Ladang Kak Ros"></label><label class="f">Farmer's WhatsApp<input name="phone" type="tel"></label></div>
+    <button class="btn">Add farm</button></form></section>`;
+  const p = farmPrices[0], fresh = p && p.price_date === todayMY();
+  const now = { mixed_box: 0, mixed_pack: 0, big_box: 0, big_pack: 0, white_pack: 0 };
+  for (const k of ["mixed", "big"]) { now[k + "_box"] = t[k].box; now[k + "_pack"] = t[k].packs; } now.white_pack = t.white.packs;
+  const changed = farmConf && Object.keys(now).some((k) => num(farmConf.snapshot[k]) !== now[k]);
+  const msg = `Salam ${f.name}, ini pautan untuk kemas kini harga strawberi dan sahkan pesanan Cameron Strawberry. Simpan pautan ini:\n${farmLink(f)}`;
+  return `<section class="panel tint"><div class="toolbar" style="margin:0"><div><h2>${esc(f.name.toLowerCase())}</h2><p class="sub">${esc(f.phone || "No phone saved")}</p></div>
+      <div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap">${f.phone ? `<a class="btn btn-small" target="_blank" rel="noopener" href="https://wa.me/${waPhone(f.phone)}?text=${encodeURIComponent(msg)}">Send her link on WhatsApp</a>` : ""}
+      <button class="btn btn-small btn-quiet" onclick="copyText('${farmLink(f)}',this)">Copy link</button>
+      ${st.confirm === "farmtoken" ? `<button class="linkbtn danger" onclick="newFarmLink()">Yes, make a new link</button><button class="linkbtn" onclick="st.confirm=null;render()">Keep</button>` : `<button class="linkbtn" onclick="st.confirm='farmtoken';render()">New link</button>`}</div></div>
+    <div class="grid2" style="margin-top:16px">
+      <div><h3>latest price</h3>${p ? `<p style="margin-top:6px"><strong>${fmtDate(p.price_date)}</strong>${fresh ? " " + chip("Today", "g") : p.price_date < isoDate(new Date(Date.now() - 2 * 864e5)) ? " " + chip("Not updated for a while", "a") : ""}</p>
+        <table style="margin-top:6px"><tbody><tr><td>Mixed</td><td class="n">${rm(p.mixed)}/kg</td><td class="n">${p.stock_mixed != null ? kgf(p.stock_mixed) + " in stock" : ""}</td></tr>
+        <tr><td>Big</td><td class="n">${rm(p.big)}/kg</td><td class="n">${p.stock_big != null ? kgf(p.stock_big) + " in stock" : ""}</td></tr>
+        <tr><td>White</td><td class="n">${rm(p.white)}/500g</td><td class="n">${p.stock_white != null ? kgf(p.stock_white) + " in stock" : ""}</td></tr></tbody></table>
+        ${p.note ? `<p class="note">${esc(p.note)}</p>` : ""}` : `<p class="sub">No prices yet. Send her the link.</p>`}</div>
+      <div><h3>order for ${fmtDate(date).toLowerCase()}</h3>
+        ${farmConf ? `<div class="${changed ? "note" : "ok"}">${changed ? "Orders changed after she confirmed. Ask her to check the link again." : "She confirmed on " + esc(new Date(farmConf.confirmed_at).toLocaleString("en-GB", { timeZone: "Asia/Kuala_Lumpur", weekday: "short", hour: "numeric", minute: "2-digit" })) + "."}</div>
+          ${farmConf.note ? `<p class="note">${esc(farmConf.note)}</p>` : ""}` : `<p class="sub" style="margin-top:6px">Not confirmed yet. She sees the boxes and packs on her link and taps confirm. Her price then becomes this week's cost.</p>`}</div></div>
+    ${farmPrices.length > 1 ? priceChart() : ""}</section>`;
+}
+function priceChart() {
+  const pts = [...farmPrices].reverse(), W0 = 640, H0 = 200, L = 44, R0 = 16, T = 16, B = 30;
+  const max = Math.max(...pts.flatMap((p) => [num(p.mixed), num(p.big), num(p.white) * 2])) * 1.1 || 1;
+  const x = (i) => L + (pts.length === 1 ? 0 : (i * (W0 - L - R0)) / (pts.length - 1)), y = (v) => T + (1 - v / max) * (H0 - T - B);
+  const line = (k, mult, color) => `<polyline fill="none" stroke="${color}" stroke-width="3" points="${pts.map((p, i) => x(i) + "," + y(num(p[k]) * mult)).join(" ")}"/>` + pts.map((p, i) => `<circle cx="${x(i)}" cy="${y(num(p[k]) * mult)}" r="3.5" fill="${color}"><title>${fmtDate(p.price_date)}: ${rm(num(p[k]) * mult)}/kg</title></circle>`).join("");
+  const ticks = [0, max / 2, max].map((v) => `<line x1="${L}" x2="${W0 - R0}" y1="${y(v)}" y2="${y(v)}" stroke="#E7DCDA"/><text x="${L - 6}" y="${y(v) + 4}" text-anchor="end" font-size="11" fill="#5E5656">RM${Math.round(v)}</text>`).join("");
+  return `<h3 style="margin-top:20px">farm price per kg, last ${pts.length} updates</h3>
+    <svg viewBox="0 0 ${W0} ${H0}" style="width:100%;max-width:${W0}px;margin-top:8px" role="img" aria-label="Farm prices per kg over time">${ticks}
+    ${line("big", 1, "#C9363F")}${line("mixed", 1, "#F0585F")}${line("white", 2, "#8AC45C")}
+    <text x="${L}" y="${H0 - 8}" font-size="11" fill="#5E5656">${fmtDate(pts[0].price_date)}</text><text x="${W0 - R0}" y="${H0 - 8}" text-anchor="end" font-size="11" fill="#5E5656">${fmtDate(pts.at(-1).price_date)}</text></svg>
+    <p class="sub"><span style="color:#C9363F;font-weight:700">Big</span>, <span style="color:#F0585F;font-weight:700">Mixed</span> and <span style="color:#3F7F22;font-weight:700">White</span> (white shown per kg, so double its 500g price).</p>`;
+}
+async function addFarm(fd) {
+  const name = String(fd.get("name") || "").trim(); if (!name) return toast("Add the farm name");
+  try { const f = await API.saveFarm({ name, phone: String(fd.get("phone") || "").trim() }); farms.push(f); await loadFarm(); render(); toast("Farm added"); } catch (e) { toast(e.message); }
+}
+async function newFarmLink() {
+  const f = farms.find((x) => x.active) || farms[0], b = new Uint8Array(24); crypto.getRandomValues(b);
+  const token = [...b].map((x) => x.toString(16).padStart(2, "0")).join("");
+  try { const n = await API.saveFarm({ id: f.id, token }); Object.assign(f, n); st.confirm = null; render(); toast("New link made. The old link no longer works."); } catch (e) { toast(e.message); }
 }
 async function saveWeek(patch) { try { week = await API.saveWeek({ ...W(), ...patch }); toast("Saved"); } catch (e) { toast(e.message); } }
 

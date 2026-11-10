@@ -12,3 +12,8 @@
 5. Create your own account at cameronstrawberry.com/login.html, then run in the SQL Editor:
    `update public.profiles set role = 'admin' where id = (select id from auth.users where email = 'YOUR EMAIL');`
 6. Riders create their own accounts; make them riders in **Admin → Team**.
+
+## Farm prices (added later)
+
+7. Run `supabase/002_farm.sql` in the SQL Editor the same way.
+8. In **Admin → Farm & packing**, add the farm and tap **Send her link on WhatsApp**.

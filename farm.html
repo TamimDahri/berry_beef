@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+<title>Ladang – Cameron Strawberry</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#F0585F">
+<link rel="icon" href="images/logo-mark.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Figtree:wght@700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/app.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/config.js"></script>
+<script src="js/common.js"></script>
+</head>
+<body>
+<header id="apphead"></header>
+<main id="main" class="narrow"><p class="empty">Sedang dimuatkan…</p></main>
+<script>
+const token = new URLSearchParams(location.search).get("k") || "";
+const FA = window.FARM_API || (() => {
+  const c = window.CS_CONFIG, sb = window.supabase.createClient(c.SUPABASE_URL, c.SUPABASE_ANON_KEY, { auth: { persistSession: false } });
+  const call = async (fn, args) => { const { data, error } = await sb.rpc(fn, args); if (error) throw new Error(error.message); return data; };
+  return {
+    view: () => call("farm_view", { p_token: token }),
+    savePrice: (p) => call("farm_save_price", { p_token: token, p_mixed: p.mixed, p_big: p.big, p_white: p.white, p_stock_mixed: p.stock_mixed, p_stock_big: p.stock_big, p_stock_white: p.stock_white, p_note: p.note }),
+    confirm: (d, note) => call("farm_confirm", { p_token: token, p_date: d, p_note: note }),
+  };
+})();
+let V;
+$("#apphead").innerHTML = `<span class="brand">${MARK}<span>cameron<br>strawberry</span></span><span class="where">Ladang</span>`;
+const hariBM = (iso) => fmtDateBM(iso);
+const masa = (ts) => new Date(ts).toLocaleString("ms-MY", { timeZone: "Asia/Kuala_Lumpur", weekday: "long", hour: "numeric", minute: "2-digit" });
+const lines = (t) => [["Campur", t.mixed_box, t.mixed_pack], ["Besar", t.big_box, t.big_pack], ["Putih", 0, t.white_pack]]
+  .filter(([, b, p]) => b || p).map(([n, b, p]) => `<li class="item"><div class="t">${n}</div><div class="amt">${[b ? b + " kotak 2kg" : "", p ? p + " pek 500g" : ""].filter(Boolean).join(" + ")}</div></li>`).join("");
+const same = (a, b) => ["mixed_box", "mixed_pack", "big_box", "big_pack", "white_pack"].every((k) => num(a[k]) === num(b[k]));
+
+async function load() {
+  try { V = await FA.view(); render(); }
+  catch (e) { $("#main").innerHTML = `<div class="panel"><h1>pautan tidak sah.</h1><p class="sub">Minta pautan baru daripada Cameron Strawberry melalui WhatsApp.</p></div>`; }
+}
+function render() {
+  const today = V.prices[0] && V.prices[0].price_date === V.today ? V.prices[0] : null, last = V.prices[0] || {};
+  const t = V.totals, c = V.confirmed, hasItems = t && (t.mixed_box + t.mixed_pack + t.big_box + t.big_pack + t.white_pack) > 0;
+  const changed = c && t && !same(c.snapshot, t);
+  $("#main").innerHTML = `
+    <h1>${esc(V.farm.name.toLowerCase())}.</h1>
+    <p class="sub">Terima kasih kerana mengemas kini harga. Harga ini hanya dilihat oleh Cameron Strawberry.</p>
+
+    <section class="panel" style="margin-top:22px" aria-labelledby="h1">
+      <h2 id="h1">harga hari ini</h2>
+      <p class="sub">${hariBM(V.today)}. ${today ? "Sudah disimpan " + esc(masa(today.updated_at)) + ". Tukar jika harga berubah." : "Belum dikemas kini hari ini."}</p>
+      <form id="pf" novalidate style="margin-top:16px">
+        <div class="row3">
+          <label class="f">Campur <small>RM sekilo</small><input name="mixed" type="number" inputmode="decimal" min="0" step="0.5" value="${last.mixed ?? ""}"></label>
+          <label class="f">Besar <small>RM sekilo</small><input name="big" type="number" inputmode="decimal" min="0" step="0.5" value="${last.big ?? ""}"></label>
+          <label class="f">Putih <small>RM 500g</small><input name="white" type="number" inputmode="decimal" min="0" step="0.5" value="${last.white ?? ""}"></label>
+        </div>
+        <p style="font-weight:700;margin:4px 0 8px">Stok ada (kg) <small style="font-weight:400;color:var(--muted)">tidak wajib</small></p>
+        <div class="row3">
+          <label class="f">Campur<input name="stock_mixed" type="number" inputmode="decimal" min="0" step="1" value="${today && today.stock_mixed != null ? today.stock_mixed : ""}"></label>
+          <label class="f">Besar<input name="stock_big" type="number" inputmode="decimal" min="0" step="1" value="${today && today.stock_big != null ? today.stock_big : ""}"></label>
+          <label class="f">Putih<input name="stock_white" type="number" inputmode="decimal" min="0" step="1" value="${today && today.stock_white != null ? today.stock_white : ""}"></label>
+        </div>
+        <label class="f">Nota <small>(contoh: hujan, buah kecil)</small><input name="note" value="${esc(today ? today.note : "")}"></label>
+        <div id="pmsg"></div>
+        <button class="btn" type="submit">Simpan harga</button>
+      </form>
+    </section>
+
+    <section class="panel tint" aria-labelledby="h2">
+      <h2 id="h2">pesanan kami</h2>
+      ${!V.delivery_date ? `<p class="sub">Tiada pesanan buat masa ini.</p>` : `
+        <p class="sub">Untuk dihantar dengan bas pada ${hariBM(V.delivery_date)}.
+        ${V.closed ? "Pesanan sudah ditutup, jumlah ini muktamad." : "Pesanan masih dibuka sehingga " + esc(masa(V.cutoff)) + ", jadi jumlah boleh bertambah."}</p>
+        ${hasItems ? `<ul class="list" style="margin-top:14px">${lines(t)}</ul>` : `<p class="empty">Belum ada pesanan lagi.</p>`}
+        ${c ? `<div class="${changed ? "note" : "ok"}">${changed ? "Pesanan berubah selepas anda sahkan. Sila semak dan sahkan semula." : "Anda sudah sahkan pesanan ini " + esc(masa(c.at)) + "."}</div>` : ""}
+        ${hasItems && (!c || changed) ? `<label class="f" style="margin-top:12px">Nota untuk kami <small>(tidak wajib)</small><input id="cnote" placeholder="contoh: Besar tinggal 4 kotak sahaja"></label>
+          <div id="cmsg"></div><button class="btn btn-green" id="conf">Sahkan pesanan</button>` : ""}`}
+    </section>
+
+    ${V.prices.length ? `<section style="margin-top:28px" aria-labelledby="h3"><h2 id="h3">harga sebelum ini</h2>
+      <table style="margin-top:10px"><thead><tr><th>Tarikh</th><th class="n">Campur /kg</th><th class="n">Besar /kg</th><th class="n">Putih /500g</th></tr></thead>
+      <tbody>${V.prices.map((p) => `<tr><td>${hariBM(p.price_date)}</td><td class="n">${rm(p.mixed)}</td><td class="n">${rm(p.big)}</td><td class="n">${rm(p.white)}</td></tr>`).join("")}</tbody></table></section>` : ""}`;
+  $("#pf").onsubmit = savePrice;
+  const cb = $("#conf"); if (cb) cb.onclick = confirmOrder;
+}
+async function savePrice(e) {
+  e.preventDefault();
+  const f = new FormData(e.target), v = (k) => String(f.get(k) || "").trim(), n = (k) => (v(k) === "" ? null : +v(k)), btn = e.submitter || $("#pf button");
+  if ([n("mixed"), n("big"), n("white")].some((x) => x === null || isNaN(x) || x < 0)) return ($("#pmsg").innerHTML = `<div class="err">Isi harga Campur, Besar dan Putih.</div>`);
+  btn.disabled = true;
+  try { await FA.savePrice({ mixed: n("mixed"), big: n("big"), white: n("white"), stock_mixed: n("stock_mixed"), stock_big: n("stock_big"), stock_white: n("stock_white"), note: v("note") }); toast("Harga disimpan. Terima kasih!"); await load(); }
+  catch (err) { $("#pmsg").innerHTML = `<div class="err">${esc(err.message)}</div>`; btn.disabled = false; }
+}
+async function confirmOrder(e) {
+  const btn = e.target; btn.disabled = true;
+  try { await FA.confirm(V.delivery_date, ($("#cnote") || {}).value || ""); toast("Pesanan disahkan. Terima kasih!"); await load(); }
+  catch (err) { $("#cmsg").innerHTML = `<div class="err">${esc(err.message)}</div>`; btn.disabled = false; }
+}
+load();
+</script>
+</body>
+</html>
