@@ -34,6 +34,9 @@ a { color: inherit; }
 .btn-small { padding: 11px 16px; font-size: .95rem; border-width: 4px; border-radius: 14px; box-shadow: 0 4px 0 var(--ink); }
 .btn-small:hover { box-shadow: 0 2px 0 var(--ink); }
 .btn-invert { background: var(--paper); }
+.top-actions { display: flex; gap: 10px; align-items: center; flex: none; }
+.cta-btns { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; }
+.wa-link { font-weight: 700; }
 
 /* header */
 .top { display: flex; align-items: center; gap: 28px; max-width: var(--wrap); margin: 0 auto; padding: 18px 24px; }
@@ -148,7 +151,7 @@ details p { padding: 0 0 24px; max-width: 40em; }
 .cta-inner { max-width: var(--wrap); margin: 0 auto; background: var(--red); border: var(--stroke) solid var(--ink); border-radius: 40px; padding: 64px 48px; display: grid; grid-template-columns: 1fr auto; gap: 12px 40px; align-items: center; }
 .cta-inner h2 { grid-column: 1; }
 .cta-inner p { grid-column: 1; font-size: 1.2rem; }
-.cta-inner .btn { grid-column: 2; grid-row: 1 / span 2; }
+.cta-inner .cta-btns { grid-column: 2; grid-row: 1 / span 2; }
 
 /* footer */
 .foot { max-width: var(--wrap); margin: 0 auto; padding: 0 24px 56px; display: flex; justify-content: space-between; gap: 32px; flex-wrap: wrap; font-size: .95rem; }
@@ -170,15 +173,16 @@ details p { padding: 0 0 24px; max-width: 40em; }
   .door { grid-template-columns: 1fr; gap: 36px; padding: 80px 24px; }
   .door figure { max-width: 460px; }
   .cta-inner { grid-template-columns: 1fr; padding: 44px 28px; }
-  .cta-inner .btn { grid-column: 1; grid-row: auto; justify-self: start; margin-top: 16px; }
+  .cta-inner .cta-btns { grid-column: 1; grid-row: auto; margin-top: 16px; }
+  .top-actions { margin-left: auto; }
   .legal { text-align: left; }
 }
 @media (max-width: 520px) {
   body { font-size: 1.0625rem; }
   .top { padding: 14px 18px; gap: 12px; }
   .brand { font-size: 1rem; }
-  .btn-small { padding: 10px 12px; font-size: .88rem; }
-  .btn-small { margin-left: auto; }
+  .btn-small { padding: 9px 11px; font-size: .86rem; }
+  .top-actions { gap: 6px; }
   .hero { padding: 24px 18px 64px; }
   .row { grid-template-columns: 1fr; gap: 14px; padding: 22px; }
   .prices, .faq { padding-left: 18px; padding-right: 18px; }
